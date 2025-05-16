@@ -1,6 +1,6 @@
 import pygame
 import random
-from constants import MOLE_SIZE, PROJECTILE_SPEED
+from src.constants import MOLE_SIZE, PROJECTILE_SPEED
 
 # Handle game events: quitting, setting start time, spawning moles, and adjusting spawn delay
 def handle_events(start_time, moles, mole_spawn_delay, mole_min_delay, screen):

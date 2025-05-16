@@ -1,5 +1,5 @@
 import pygame
-from constants import PLAYER_RADIUS
+from src.constants import PLAYER_RADIUS
 
 # Display the top players' scores on the screen
 def show_leaderboard(screen, font, leaderboard):

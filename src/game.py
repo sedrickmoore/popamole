@@ -1,10 +1,10 @@
 import pygame
 import os
-from constants import *
-from db import init_db, get_nickname, save_score, get_leaderboard
-from assets import init_assets
-from ui import draw_game, display_controls, show_leaderboard
-from events import handle_events, check_collisions
+from src.constants import *
+from src.db import init_db, get_nickname, save_score, get_leaderboard
+from src.assets import init_assets
+from src.ui import draw_game, display_controls, show_leaderboard
+from src.events import handle_events, check_collisions
 
 # Main game function containing initialization, the game loop, and end of game logic
 def play_pop_a_mole():

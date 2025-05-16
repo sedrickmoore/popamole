@@ -1,6 +1,6 @@
 import os
 import pygame
-from constants import MOLE_SIZE
+from src.constants import MOLE_SIZE
 
 
 # Load and return font, images, and sound effects
