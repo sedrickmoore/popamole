@@ -1,0 +1,22 @@
+# Bytecode and caches
+__pycache__/
+*.pyc
+
+# macOS metadata
+.DS_Store
+
+# Built apps
+build/
+dist/
+*.app
+*.egg-info/
+
+# Local database
+scores.db
+
+# py2app log/output
+*.log
+
+# IDE/project files
+.vscode/
+.idea/
