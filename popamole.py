@@ -2,7 +2,9 @@ import pygame
 import random
 import sqlite3
 import re
+import os
 
+# Constants
 PLAYER_RADIUS = 30
 PLAYER_SPEED = 1000
 PLAYER_COLLISION = 2000
@@ -14,6 +16,10 @@ GAME_DURATION = 30
 
 # Database setup
 def init_db():
+    """
+    Connects to or creates the database and creates the 'scores' table if it doesn't exist.
+    Returns the database connection object.
+    """
     conn = sqlite3.connect("scores.db")
     cur = conn.cursor()
     cur.execute('''
@@ -25,9 +31,14 @@ def init_db():
     conn.commit()
     return conn
 
+# Save player's new highest score
 def save_score(conn, nickname, score):
-    c = conn.cursor()
-    c.execute('''
+    """
+    Inserts a new score into the table for the player (identified by their nickname).
+    If the nickname already exists, updates the score only if the new score is higher than the saved score.
+    """
+    cur = conn.cursor()
+    cur.execute('''
         INSERT INTO scores (nickname, high_score)
         VALUES (?, ?)
         ON CONFLICT(nickname) DO UPDATE SET high_score = 
@@ -35,18 +46,29 @@ def save_score(conn, nickname, score):
     ''', (nickname, score))
     conn.commit()
 
+# Retrieve the top player scores (default limit to 5)
 def get_leaderboard(conn, limit=5):
-    c = conn.cursor()
-    c.execute('''
+    """
+    Returns a list of tuples (nickname, high_score) sorted by the highest score.
+    Limits results to a specified number (default is 5).
+    """
+    cur = conn.cursor()
+    cur.execute('''
         SELECT nickname, MAX(high_score) as score
         FROM scores
         GROUP BY nickname
         ORDER BY score DESC
         LIMIT ?
     ''', (limit,))
-    return c.fetchall()
+    return cur.fetchall()
 
+# Ask the player to enter a valid nickname using regex
 def get_nickname(screen, font):
+    """
+    Asks the player to enter a nickname (3–12 characters).
+    Accepts only letters, digits, and underscores using regex validation.
+    Returns the nickname when Enter is pressed and input is valid.
+    """
     nickname = ""
     input_active = True
     pattern = re.compile(r"^[A-Za-z0-9_]{3,12}$")
@@ -71,26 +93,41 @@ def get_nickname(screen, font):
                 elif len(nickname) < 12 and event.unicode.isprintable():
                     nickname += event.unicode
 
+# Display the top players' scores on the screen
 def show_leaderboard(screen, font, leaderboard):
     title = font.render("Top Scores", True, (255, 255, 255))
     screen.blit(title, (screen.get_width() // 2 - title.get_width() // 2, 50))
-    for i, (nick, score) in enumerate(leaderboard):
-        line = font.render(f"{i+1}. {nick}: {score}", True, (255, 255, 255))
+    for i, (name, score) in enumerate(leaderboard):
+        line = font.render(f"{i+1}. {name}: {score}", True, (255, 255, 255))
         screen.blit(line, (screen.get_width() // 2 - line.get_width() // 2, 150 + i * 50))
     pygame.display.update()
     pygame.time.delay(4000)
 
+# Load and return font, images, and sound effects
 def init_assets():
     font = pygame.font.Font(None, 48)
-    projectile_image = pygame.image.load("water-squirt.png").convert_alpha()
+    projectile_image = pygame.image.load(os.path.join("Media", "water-squirt.png")).convert_alpha()
     projectile_image = pygame.transform.scale(projectile_image,(MOLE_SIZE * 1.5,MOLE_SIZE * 1.5))
-    mole_image = pygame.image.load("mole.png").convert_alpha()
+    mole_image = pygame.image.load(os.path.join("Media", "mole.png")).convert_alpha()
     mole_image = pygame.transform.scale(mole_image, (MOLE_SIZE * 2, MOLE_SIZE * 2))
-    projectile_sound = pygame.mixer.Sound("PopAMole-WaterShot.mp3")
-    mole_hit = pygame.mixer.Sound("PopAMole-MoleHit.mp3")
+    projectile_sound = pygame.mixer.Sound(os.path.join("Media", "PopAMole-WaterShot.mp3"))
+    mole_hit = pygame.mixer.Sound(os.path.join("Media", "PopAMole-MoleHit.mp3"))
     return font, projectile_image, mole_image, projectile_sound, mole_hit
 
+# Handle game events: quitting, setting start time, spawning moles, and adjusting spawn delay
 def handle_events(start_time, moles, mole_spawn_delay, mole_min_delay, screen):
+    """
+    Processes game events during the game loop:
+    - Quits the game if the window is closed or Escape is pressed
+    - Starts the game timer on first mole spawn (so the user has the full timer)
+    - Spawns moles at random positions
+    - Gradually increases difficulty by decreasing spawn delay over time
+
+    Returns:
+    - continue_game (bool): False if quit triggered
+    - start_time (int or None): Updated game start time
+    - mole_spawn_delay (int): Updated delay for mole spawning
+    """
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             return False, start_time, mole_spawn_delay
@@ -111,7 +148,24 @@ def handle_events(start_time, moles, mole_spawn_delay, mole_min_delay, screen):
                 pygame.time.set_timer(pygame.USEREVENT, mole_spawn_delay)
     return True, start_time, mole_spawn_delay
 
+# Handle collisions between projectiles and moles, update score and bonus time
 def check_collisions(projectiles, moles, mole_hit, dt, score):
+    """
+    Checks for collisions between projectiles and moles.
+
+    - If a projectile hits a mole:
+        - Removes the mole and the projectile
+        - Plays a sound effect
+        - Increases score by 1
+        - Adds bonus time:
+            - +5 seconds if new score is divisible by 10
+            - +2 seconds if divisible by 5 (but not 10)
+            - +1 second otherwise
+
+    - Also removes projectiles that go off-screen
+
+    Returns score increase and bonus time increase
+    """
     score_increase = 0
     bonus_time_increase = 0
     for projectile in projectiles[:]:
@@ -133,7 +187,16 @@ def check_collisions(projectiles, moles, mole_hit, dt, score):
                 break
     return score_increase, bonus_time_increase
 
+# Draw all game elements: background, moles, player, projectiles, and UI
 def draw_game(screen, mole_image, projectile_image, moles, projectiles, player_pos, player_color, font, score, start_time, time_left):
+    """
+    Renders all visible elements of the game:
+    - Forest green background
+    - Active moles
+    - Player avatar (a circle)
+    - Projectiles
+    - Score and timer (if game has started)
+    """
     screen.fill("forestgreen")
     for mole_pos in moles:
         mole_rect = mole_image.get_rect(center=mole_pos["pos"])
@@ -149,7 +212,12 @@ def draw_game(screen, mole_image, projectile_image, moles, projectiles, player_p
         screen.blit(time_text, (20, 70))
     pygame.display.update()
 
+# Display a list of controls
 def display_controls(screen, font):
+    """
+    Displays the control instructions on screen and waits for the player to press ENTER to start.
+    Allows quitting with ESC or window close.
+    """
     screen.fill("forestgreen")
     title = font.render("Pop-A-Mole", True, (255, 255, 255))
     controls = [
@@ -180,14 +248,39 @@ def display_controls(screen, font):
                     pygame.quit()
                     exit()
 
+# Main game function containing initialization, the game loop, and end of game logic
 def play_pop_a_mole():
+    """
+    - Initializes Pygame, screen, clock, and background music
+    - Connects to the database and retrieves the player's nickname
+    - Displays control instructions on first run
+    - Runs the main game loop:
+        - Handles events and player input
+        - Spawns and updates moles and projectiles
+        - Since mole spawn to music gradually
+        - Detects collisions and updates score and bonus time
+        - Changes player color based on movement or boundary collisions
+        - Draws all game elements each frame
+        - Ends the game when time runs out
+    - After game ends:
+        - Displays final score and leaderboard
+        - Allows the player to replay or quit
+    """
     pygame.init()
     screen = pygame.display.set_mode((1280,720), pygame.FULLSCREEN)
     pygame.display.set_caption("Pop-A-Mole")
     game_clock = pygame.time.Clock()
-    pygame.mixer.music.load("PopAMole.mp3")
+
+    SONGS = {
+        "PopAMole.mp3": 123
+    }
+    song_file = "PopAMole.mp3"
+    bpm = SONGS[song_file]
+
+    pygame.mixer.music.load(os.path.join("Media", song_file))
     pygame.mixer.music.set_volume(0.5)
     pygame.mixer.music.play(-1)
+
     font, _, _, _, _ = init_assets()
 
     first_run = True
@@ -220,7 +313,7 @@ def play_pop_a_mole():
         moles = []
 
         mole_spawn_delay = 2000
-        mole_min_delay = 500
+        mole_min_delay = int(60_000 / bpm)
 
         pygame.time.set_timer(pygame.USEREVENT, mole_spawn_delay)
         pygame.time.set_timer(pygame.USEREVENT + 1, MOLE_SHRINK_INTERVAL)

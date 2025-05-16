@@ -2,11 +2,14 @@ from setuptools import setup
 
 APP = ['popamole.py']
 DATA_FILES = [
-    'water-squirt.png',
-    'PopAMole-WaterShot.mp3',
-    'PopAMole-MoleHit.mp3',
-    'PopAMole.mp3',
-    'mole.png'
+    ('Media', [
+        'Media/water-squirt.png',
+        'Media/PopAMole-WaterShot.mp3',
+        'Media/PopAMole-MoleHit.mp3',
+        'Media/PopAMole.mp3',
+        'Media/mole.png',
+        'Media/mole.ico'
+    ])
 ]
 OPTIONS = {
     'argv_emulation': True,
@@ -18,7 +21,7 @@ OPTIONS = {
         'CFBundleIdentifier': 'com.sedrickmoore.popamole',
         'CFBundleVersion': '1.0'
     },
-    'iconfile': 'mole.ico',
+    'iconfile': 'Media/mole.ico',
 }
 
 setup(
