@@ -18,6 +18,7 @@ OPTIONS = {
         'CFBundleIdentifier': 'com.sedrickmoore.popamole',
         'CFBundleVersion': '1.0'
     },
+    'iconfile': 'mole.ico',
 }
 
 setup(
